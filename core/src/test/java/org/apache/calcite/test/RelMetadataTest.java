@@ -23,6 +23,7 @@ import org.apache.calcite.plan.RelOptCluster;
 import org.apache.calcite.plan.RelOptPlanner;
 import org.apache.calcite.plan.RelOptPredicateList;
 import org.apache.calcite.plan.RelOptTable;
+import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.RelTraitSet;
 import org.apache.calcite.plan.hep.HepPlanner;
 import org.apache.calcite.plan.hep.HepProgram;
@@ -125,6 +126,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 import static org.apache.calcite.test.Matchers.hasFieldNames;
 import static org.apache.calcite.test.Matchers.isAlmost;
@@ -141,6 +143,7 @@ import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.CoreMatchers.startsWith;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.hasItems;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -3210,6 +3213,65 @@ public class RelMetadataTest {
         .build();
     final RelOptTable tableOrigin = mq.getTableOrigin(agg);
     assertThat(tableOrigin, nullValue());
+  }
+
+  @Test void testGetAllPredicatesForJoin() {
+    String sql1 =
+        "select * from emp inner join dept on emp.deptno=dept.DEPTNO and dept.name = 'yyy'"
+         + " inner join bonus on emp.ename = bonus.ename and bonus.job = 'xxx'";
+    RelNode x = sql(sql1).toRel();
+    RelMetadataQuery mq = x.getCluster().getMetadataQuery();
+
+    List<RexNode> predicates = mq.getPulledUpPredicates(x).pulledUpPredicates;
+    assertThat(predicates.size(), equalTo(4));
+    assertThat(predicates.toString(), is("[=($7, $9), =($10, 'yyy'), =($1, $11), =($12, 'xxx')]"));
+
+    List<String> predicateStrs = requireNonNull(mq.getAllPredicates(x))
+        .pulledUpPredicates.stream()
+        .flatMap(rel -> RelOptUtil.conjunctions(rel).stream())
+        .map(RexNode::toString)
+        .collect(Collectors.toList());
+    assertThat(predicateStrs.size(), equalTo(4));
+    assertThat(predicateStrs,
+        hasItems(
+            "=([CATALOG, SALES, EMP].#0.$7, [CATALOG, SALES, DEPT].#0.$0)",
+            "=([CATALOG, SALES, DEPT].#0.$1, 'yyy')",
+            "=([CATALOG, SALES, BONUS].#0.$1, 'xxx')",
+            "=([CATALOG, SALES, EMP].#0.$1, [CATALOG, SALES, BONUS].#0.$0)"
+        )
+    );
+  }
+
+  @Test void testGetAllPredicatesForLeftJoin() {
+    String sql1 =
+        "select * from (select * from emp where MGR = 123456) x left join dept on x.deptno=dept.DEPTNO"
+            + " left join bonus on x.ename = bonus.ename and bonus.job = 'xxx'";
+    RelNode relNode1 = sql(sql1).toRel();
+    RelMetadataQuery mq = relNode1.getCluster().getMetadataQuery();
+
+    List<RexNode> predicates = mq.getPulledUpPredicates(relNode1).pulledUpPredicates;
+    assertThat(predicates.size(), equalTo(1));
+    assertThat(predicates.get(0).toString(), is("=($3, 123456)"));
+
+    predicates = requireNonNull(mq.getAllPredicates(relNode1)).pulledUpPredicates;
+    assertThat(predicates, notNullValue());
+    assertThat(predicates.size(), equalTo(1));
+    assertThat(predicates.get(0).toString(), is("=([CATALOG, SALES, EMP].#0.$3, 123456)"));
+
+    String sql2 =
+        "select * from emp left join dept on emp.deptno=dept.DEPTNO"
+            + " left join bonus on emp.ename = bonus.ename and bonus.job = 'xxx'";
+    RelNode relNode2 = sql(sql2).toRel();
+    assertThat(mq.getAllPredicates(relNode2), is(RelOptPredicateList.EMPTY));
+
+    String sql3 =
+        "select * from emp left join dept on emp.deptno=dept.DEPTNO"
+            + " left join bonus on emp.ename = bonus.ename and bonus.job = 'xxx' where MGR = 123456";
+    RelNode relNode3 = sql(sql3).toRel();
+    predicates = requireNonNull(mq.getAllPredicates(relNode3)).pulledUpPredicates;
+    assertThat(predicates, notNullValue());
+    assertThat(predicates.size(), equalTo(1));
+    assertThat(predicates.get(0).toString(), is("=([CATALOG, SALES, EMP].#0.$3, 123456)"));
   }
 
   @Test void testGetPredicatesForJoin() {

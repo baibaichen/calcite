@@ -26,6 +26,7 @@ import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Join;
+import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.SetOp;
 import org.apache.calcite.rel.core.Sort;
@@ -192,8 +193,11 @@ public class RelMdAllPredicates
    */
   public @Nullable RelOptPredicateList getAllPredicates(Join join, RelMetadataQuery mq) {
     if (join.getJoinType().isOuterJoin()) {
-      // We cannot map origin of this expression.
-      return null;
+      if (join.getJoinType() != JoinRelType.LEFT) {
+        // We cannot map origin of this expression.
+        return null;
+      }
+      return mq.getAllPredicates(join.getLeft());
     }
 
     final RexBuilder rexBuilder = join.getCluster().getRexBuilder();
