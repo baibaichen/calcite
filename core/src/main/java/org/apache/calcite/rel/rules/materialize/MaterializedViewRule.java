@@ -56,6 +56,7 @@ import org.apache.calcite.util.graph.DirectedGraph;
 import org.apache.calcite.util.mapping.IntPair;
 import org.apache.calcite.util.mapping.Mapping;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
@@ -65,6 +66,7 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 
 import org.checkerframework.checker.nullness.qual.Nullable;
+import org.immutables.value.Value;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -636,7 +638,7 @@ public abstract class MaterializedViewRule<C extends MaterializedViewRule.Config
       if (Join.class.isAssignableFrom(c)) {
         for (RelNode n : e.getValue()) {
           final Join join = (Join) n;
-          if (join.getJoinType() != JoinRelType.INNER) {
+          if (join.getJoinType() != config.joinType()) {
             // Skip it
             return false;
           }
@@ -1415,5 +1417,26 @@ public abstract class MaterializedViewRule<C extends MaterializedViewRule.Config
 
     /** Sets {@link #fastBailOut()}. */
     Config withFastBailOut(boolean b);
+
+    /** Information about the supported join-type, default is {@link JoinRelType#INNER}.
+     * <p>
+     * Currently, we don't support mix join, and only support {@link JoinRelType#INNER} and
+     * {@link JoinRelType#LEFT}
+     */
+    @Value.Default default JoinRelType joinType() {
+      return JoinRelType.INNER;
+    }
+
+    /** Sets {@link #joinType()}. */
+    Config withJoinType(JoinRelType joinType);
+
+    @Value.Check
+    default void check() {
+      Preconditions.checkState(
+          joinType() == JoinRelType.INNER || joinType() == JoinRelType.LEFT,
+          "'joinType()' is JoinRelType.%s, "
+              + "it should be either JoinRelType.INNER or JoinRelType.LEFT",
+          joinType());
+    }
   }
 }

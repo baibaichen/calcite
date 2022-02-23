@@ -830,6 +830,15 @@ class MaterializedViewRelOptRulesTest {
         .ok();
   }
 
+  @Test void testLeftJoinMaterialization1() {
+    sql("select \"emps\".\"empid\", \"emps\".\"deptno\", \"depts\".\"deptno\" from \"emps\"\n"
+            + "left join \"depts\" using (\"deptno\")",
+        "select \"empid\" \"deptno\" from \"emps\"\n"
+            + "left join \"depts\" using (\"deptno\") where \"empid\" = 1")
+        .checkingThatResultContains("EnumerableTableScan(table=[[hr, MV0]])")
+        .ok();
+  }
+
   @Test void testJoinMaterialization5() {
     sql("select cast(\"empid\" as BIGINT) from \"emps\"\n"
             + "join \"depts\" using (\"deptno\")",

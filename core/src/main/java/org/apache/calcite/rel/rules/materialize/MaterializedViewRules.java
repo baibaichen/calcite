@@ -44,9 +44,13 @@ public abstract class MaterializedViewRules {
   public static final RelOptRule FILTER =
       MaterializedViewOnlyFilterRule.Config.DEFAULT.toRule();
 
-  /** Rule that matches {@link Join}. */
+  /** Rule that matches inner {@link Join}. */
   public static final RelOptRule JOIN =
       MaterializedViewOnlyJoinRule.Config.DEFAULT.toRule();
+
+  /** Rule that matches left {@link Join}. */
+  public static final RelOptRule LEFT_JOIN =
+      MaterializedViewOnlyLeftJoinRule.Config.DEFAULT.toRule();
 
   /** Rule that matches {@link Project} on {@link Filter}. */
   public static final RelOptRule PROJECT_FILTER =

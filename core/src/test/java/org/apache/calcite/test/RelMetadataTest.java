@@ -176,6 +176,9 @@ public class RelMetadataTest {
   private static final List<String> EMP_QNAME =
       ImmutableList.of("CATALOG", "SALES", "EMP");
 
+  private static final List<String> DEPT_QNAME =
+      ImmutableList.of("CATALOG", "SALES", "DEPT");
+
   /** Ensures that tests that use a lot of memory do not run at the same
    * time. */
   private static final ReentrantLock LOCK = new ReentrantLock();
@@ -2322,6 +2325,19 @@ public class RelMetadataTest {
     assertExpressionLineage(sql, 0, expected, comment);
   }
 
+  @Test void testExpressionLineageBetweenExpressionWithLeftJoin() {
+    String sql = "select dept.deptno + empno between 1 and 2"
+        + " from emp left join dept on emp.deptno = dept.deptno";
+    String expected = "[AND(>=(+([CATALOG, SALES, DEPT].#0.$0, [CATALOG, SALES, EMP].#0.$0), 1),"
+        + " <=(+([CATALOG, SALES, DEPT].#0.$0, [CATALOG, SALES, EMP].#0.$0), 2))]";
+    String comment = "'empno' is column 0 in 'catalog.sales.emp', "
+        + "'deptno' is column 0 in 'catalog.sales.dept', and "
+        + "'dept.deptno + empno between 1 and 2' is translated into "
+        + "'dept.deptno + empno >= 1 and dept.deptno + empno <= 2'";
+
+    assertExpressionLineage(sql, 0, expected, comment);
+  }
+
   @Test void testExpressionLineageInnerJoinLeft() {
     // ename is column 1 in catalog.sales.emp
     final RelNode rel = sql("select ename from emp,dept").toRel();
@@ -2420,7 +2436,14 @@ public class RelMetadataTest {
 
     final RexNode ref = RexInputRef.of(0, rel.getRowType().getFieldList());
     final Set<RexNode> r = mq.getExpressionLineage(rel, ref);
-    assertNull(r);
+    assertThat(r.size(), is(1));
+    final String resultString = r.iterator().next().toString();
+    assertThat(resultString, startsWith(DEPT_QNAME.toString()));
+
+    final RelNode tableRel = sql("select * from dept").toRel();
+    final String inputRef =
+        RexInputRef.of(1, tableRel.getRowType().getFieldList()).toString();
+    assertThat(resultString, endsWith(inputRef));
   }
 
   @Test void testExpressionLineageFilter() {
@@ -3213,6 +3236,32 @@ public class RelMetadataTest {
         .get(0)
         .toString(),
         is("=($0, $8)"));
+
+    RelNode leftJoin = builder
+        .scan("EMP")
+        .filter(
+            builder.equals(
+                builder.field("ENAME"),
+                builder.literal("50")
+            )
+        )
+        .scan("DEPT")
+        .filter(
+            builder.equals(
+                builder.field("DNAME"),
+                builder.literal("IT")
+            )
+        )
+        .join(JoinRelType.LEFT,
+            builder.call(SqlStdOperatorTable.EQUALS,
+                builder.field(2, 0, 0),
+                builder.field(2, 1, 0)))
+        .build();
+    assertThat(mq.getPulledUpPredicates(leftJoin)
+            .pulledUpPredicates
+            .get(0)
+            .toString(),
+        is("=($1, '50')"));
   }
 
   @Test void testGetPredicatesForFilter() throws Exception {

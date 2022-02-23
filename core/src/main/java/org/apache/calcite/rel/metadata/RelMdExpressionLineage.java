@@ -24,7 +24,6 @@ import org.apache.calcite.rel.core.Calc;
 import org.apache.calcite.rel.core.Exchange;
 import org.apache.calcite.rel.core.Filter;
 import org.apache.calcite.rel.core.Join;
-import org.apache.calcite.rel.core.JoinRelType;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.Sort;
 import org.apache.calcite.rel.core.TableModify;
@@ -180,7 +179,6 @@ public class RelMdExpressionLineage
   /**
    * Expression lineage from {@link Join}.
    *
-   * <p>We only extract the lineage for INNER joins.
    */
   public @Nullable Set<RexNode> getExpressionLineage(Join rel, RelMetadataQuery mq,
       RexNode outputExpression) {
@@ -188,31 +186,6 @@ public class RelMdExpressionLineage
     final RelNode leftInput = rel.getLeft();
     final RelNode rightInput = rel.getRight();
     final int nLeftColumns = leftInput.getRowType().getFieldList().size();
-
-    // Extract input fields referenced by expression
-    final ImmutableBitSet inputFieldsUsed = extractInputRefs(outputExpression);
-
-    if (rel.getJoinType().isOuterJoin()) {
-      // If we reference the inner side, we will bail out
-      if (rel.getJoinType() == JoinRelType.LEFT) {
-        ImmutableBitSet rightFields = ImmutableBitSet.range(
-            nLeftColumns, rel.getRowType().getFieldCount());
-        if (inputFieldsUsed.intersects(rightFields)) {
-          // We cannot map origin of this expression.
-          return null;
-        }
-      } else if (rel.getJoinType() == JoinRelType.RIGHT) {
-        ImmutableBitSet leftFields = ImmutableBitSet.range(
-            0, nLeftColumns);
-        if (inputFieldsUsed.intersects(leftFields)) {
-          // We cannot map origin of this expression.
-          return null;
-        }
-      } else {
-        // We cannot map origin of this expression.
-        return null;
-      }
-    }
 
     // Gather table references
     final Set<RelTableRef> leftTableRefs = mq.getTableReferences(leftInput);
@@ -240,6 +213,9 @@ public class RelMdExpressionLineage
       currentTablesMapping.put(rightRef,
           RelTableRef.of(rightRef.getTable(), shift + rightRef.getEntityNumber()));
     }
+
+    // Extract input fields referenced by expression
+    final ImmutableBitSet inputFieldsUsed = extractInputRefs(outputExpression);
 
     // Infer column origin expressions for given references
     final Map<RexInputRef, Set<RexNode>> mapping = new LinkedHashMap<>();
