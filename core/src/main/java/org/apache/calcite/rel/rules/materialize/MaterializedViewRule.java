@@ -218,18 +218,7 @@ public abstract class MaterializedViewRule<C extends MaterializedViewRule.Config
           continue;
         }
 
-        // Filter relevant materializations. Currently, we only check whether
-        // the materialization contains any table that is used by the query
-        // TODO: Filtering of relevant materializations can be improved to be more fine-grained.
-        boolean applicable = false;
-        for (RelTableRef tableRef : viewTableRefs) {
-          if (queryTableRefs.contains(tableRef)) {
-            applicable = true;
-            break;
-          }
-        }
-        if (!applicable) {
-          // Skip it
+        if (!isApplicableView(topProject, node, queryTableRefs, materialization, viewTableRefs)) {
           continue;
         }
 
@@ -485,6 +474,25 @@ public abstract class MaterializedViewRule<C extends MaterializedViewRule.Config
         }
       }
     }
+  }
+
+  protected boolean isApplicableView(
+      @Nullable Project topProject, RelNode node, Set<RelTableRef> queryTableRefs,
+      RelOptMaterialization materialization, Set<RelTableRef> viewTableRefs) {
+    Util.discard(topProject);
+    Util.discard(node);
+    Util.discard(materialization);
+    // Filter relevant materializations. Currently, we only check whether
+    // the materialization contains any table that is used by the query
+    // TODO: Filtering of relevant materializations can be improved to be more fine-grained.
+    boolean applicable = false;
+    for (RelTableRef tableRef : viewTableRefs) {
+      if (queryTableRefs.contains(tableRef)) {
+        applicable = true;
+        break;
+      }
+    }
+    return applicable;
   }
 
   protected abstract boolean isValidPlan(@Nullable Project topProject, RelNode node,
