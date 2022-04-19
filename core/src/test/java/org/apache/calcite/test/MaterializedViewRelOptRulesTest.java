@@ -830,7 +830,8 @@ class MaterializedViewRelOptRulesTest {
         .ok();
   }
 
-  @Test void testLeftJoinMaterialization1() {
+  @Test @Disabled("MaterializedViewOnlyLeftJoinRule is removed, will be move to kap")
+  void testLeftJoinMaterialization1() {
     sql("select \"emps\".\"empid\", \"emps\".\"deptno\", \"depts\".\"deptno\" from \"emps\"\n"
             + "left join \"depts\" using (\"deptno\")",
         "select \"empid\" \"deptno\" from \"emps\"\n"

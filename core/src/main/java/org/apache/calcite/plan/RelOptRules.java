@@ -144,7 +144,6 @@ public class RelOptRules {
       MaterializedViewRules.PROJECT_FILTER,
       MaterializedViewRules.FILTER,
       MaterializedViewRules.PROJECT_JOIN,
-      MaterializedViewRules.LEFT_JOIN,
       MaterializedViewRules.JOIN,
       MaterializedViewRules.PROJECT_AGGREGATE,
       MaterializedViewRules.AGGREGATE);
