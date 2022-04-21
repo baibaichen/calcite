@@ -67,6 +67,32 @@ public class DefaultDirectedGraph<V, E extends DefaultEdge>
         + ", edges: " + edges + ")";
   }
 
+  @Override public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof DefaultDirectedGraph)) {
+      return false;
+    }
+
+    DefaultDirectedGraph<?, ?> that = (DefaultDirectedGraph<?, ?>) o;
+
+    if (!edges.equals(that.edges)) {
+      return false;
+    }
+    if (!vertexMap.equals(that.vertexMap)) {
+      return false;
+    }
+    return edgeFactory.equals(that.edgeFactory);
+  }
+
+  @Override public int hashCode() {
+    int result = edges.hashCode();
+    result = 31 * result + vertexMap.hashCode();
+    result = 31 * result + edgeFactory.hashCode();
+    return result;
+  }
+
   @Override public String toString() {
     @SuppressWarnings("unchecked")
     final Ordering<V> vertexOrdering = (Ordering) Ordering.usingToString();
@@ -256,5 +282,26 @@ public class DefaultDirectedGraph<V, E extends DefaultEdge>
   static class VertexInfo<V, E> {
     final List<E> outEdges = new ArrayList<>();
     final List<E> inEdges = new ArrayList<>();
+
+    @Override public boolean equals(Object o) {
+      if (this == o) {
+        return true;
+      }
+      if (!(o instanceof VertexInfo)) {
+        return false;
+      }
+
+      VertexInfo<?, ?> that = (VertexInfo<?, ?>) o;
+      if (!outEdges.equals(that.outEdges)) {
+        return false;
+      }
+      return inEdges.equals(that.inEdges);
+    }
+
+    @Override public int hashCode() {
+      int result = outEdges.hashCode();
+      result = 31 * result + inEdges.hashCode();
+      return result;
+    }
   }
 }
